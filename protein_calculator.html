@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protein Cost Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .item-list {
+            margin-top: 20px;
+        }
+        .item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .item:last-child {
+            margin-bottom: 0;
+        }
+        .item strong {
+            color: #333;
+        }
+        .item button {
+            background-color: #f44336;
+        }
+        .item button:hover {
+            background-color: #da190b;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+            }
+            .item {
+                flex-direction: column;
+            }
+            .item button {
+                width: 100%;
+                margin-top: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Protein Cost Calculator</h1>
+        <div class="input-group">
+            <label for="itemName">Item Name:</label>
+            <input type="text" id="itemName" placeholder="e.g., Textured Soy Protein">
+            <label for="brand">Brand:</label>
+            <input type="text" id="brand" placeholder="e.g., Amazon">
+            <label for="price">Price ($):</label>
+            <input type="number" id="price" step="0.01" placeholder="e.g., 10.99">
+            <label for="unitWeight">Unit Weight (g):</label>
+            <input type="number" id="unitWeight" placeholder="e.g., 500">
+            <label for="servingWeight">Serving Weight (g):</label>
+            <input type="number" id="servingWeight" placeholder="e.g., 30">
+            <label for="protein">Protein per Serving (g):</label>
+            <input type="number" id="protein" placeholder="e.g., 20">
+            <label for="productLink">Product Link:</label>
+            <input type="url" id="productLink" placeholder="e.g., https://amazon.com/product">
+            <button onclick="addItem()">Add Item</button>
+        </div>
+
+        <!-- CSV Buttons -->
+        <div id="csv-buttons">
+            <button onclick="saveToCSV()" style="margin-right: 10px;">Export CSV</button>
+            <input type="file" id="csvFile" style="display: none;" accept=".csv" onchange="loadFromCSV(this.files[0])">
+            <button onclick="document.getElementById('csvFile').click()">Import CSV</button>
+        </div>
+    </div>
+
+    <div class="item-list">
+        <h2>Your Items</h2>
+        <div id="items"></div>
+    </div>
+
+    <script>
+        let items = [];
+        const CSV_FILE = 'data.csv';
+        const CSV_HEADERS = ['name', 'brand', 'cost', 'price', 'unitWeight', 'servingWeight', 'protein', 'productLink'];
+
+        function calculateCostPer30g(price, unitWeight, servingWeight, protein) {
+            try {
+                return (30 * price * servingWeight) / (protein * unitWeight);
+            } catch (error) {
+                return Infinity;
+            }
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('proteinItems', JSON.stringify(items));
+        }
+
+        function loadFromLocalStorage() {
+            const savedItems = localStorage.getItem('proteinItems');
+            if (savedItems) {
+                items = JSON.parse(savedItems);
+                updateItemsList();
+            }
+        }
+
+        function saveToCSV() {
+            // Convert items to CSV format
+            const csvContent = [
+                CSV_HEADERS.join(','),
+                ...items.map(item => CSV_HEADERS.map(header => item[header]).join(','))
+            ].join('\n');
+
+            // Create and trigger download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = CSV_FILE;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function loadFromCSV(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const text = e.target.result;
+                const rows = text.split('\n');
+                const headers = rows[0].split(',');
+                const csvItems = rows.slice(1).map(row => {
+                    const values = row.split(',');
+                    return headers.reduce((obj, header, i) => {
+                        obj[header] = values[i];
+                        return obj;
+                    }, {});
+                });
+                items = csvItems;
+                updateItemsList();
+                saveToLocalStorage();
+            };
+            reader.readAsText(file);
+        }
+
+        function addItem() {
+            const itemName = document.getElementById('itemName').value;
+            const brand = document.getElementById('brand').value;
+            const price = parseFloat(document.getElementById('price').value);
+            const unitWeight = parseFloat(document.getElementById('unitWeight').value);
+            const servingWeight = parseFloat(document.getElementById('servingWeight').value);
+            const protein = parseFloat(document.getElementById('protein').value);
+            const productLink = document.getElementById('productLink').value;
+
+            if (!itemName || isNaN(price) || isNaN(unitWeight) || isNaN(servingWeight) || isNaN(protein)) {
+                alert('Please fill in all fields with valid numbers');
+                return;
+            }
+
+            const costPer30g = calculateCostPer30g(price, unitWeight, servingWeight, protein);
+            
+            items.push({
+                name: itemName,
+                brand: brand,
+                cost: costPer30g,
+                price: price,
+                unitWeight: unitWeight,
+                servingWeight: servingWeight,
+                protein: protein,
+                productLink: productLink
+            });
+
+            items.sort((a, b) => a.cost - b.cost);
+            updateItemsList();
+            clearForm();
+        }
+
+        function updateItemsList() {
+            const itemsDiv = document.getElementById('items');
+            itemsDiv.innerHTML = items.map((item, index) => `
+                <div class="item">
+                    <div>
+                        <strong>${item.name} - ${item.brand}</strong><br>
+                        Cost per 30g protein: $${item.cost.toFixed(2)}<br>
+                        Price: $${item.price} | Unit Weight: ${item.unitWeight}g | Serving: ${item.servingWeight}g | Protein: ${item.protein}g
+                        ${item.productLink ? `<br><a href="${item.productLink}" target="_blank">View Product</a>` : ''}
+                    </div>
+                    <button onclick="deleteItem(${index})" style="color: red;">Delete</button>
+                </div>
+            `).join('');
+        }
+
+        function deleteItem(index) {
+            if (confirm('Are you sure you want to delete this item?')) {
+                items.splice(index, 1);
+                updateItemsList();
+            }
+        }
+
+        function clearAll() {
+            if (confirm('Are you sure you want to clear all items? This cannot be undone.')) {
+                items = [];
+                updateItemsList();
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('itemName').value = '';
+            document.getElementById('brand').value = '';
+            document.getElementById('price').value = '';
+            document.getElementById('unitWeight').value = '';
+            document.getElementById('servingWeight').value = '';
+            document.getElementById('protein').value = '';
+            document.getElementById('productLink').value = '';
+        }
+
+        // Load saved items when page loads
+        window.onload = loadFromLocalStorage;
+
+        // Save items when they change
+        items.push = function(item) {
+            Array.prototype.push.call(this, item);
+            saveToLocalStorage();
+        };
+
+        items.splice = function() {
+            const result = Array.prototype.splice.apply(this, arguments);
+            saveToLocalStorage();
+            return result;
+        };
+
+        items.sort = function() {
+            const result = Array.prototype.sort.apply(this, arguments);
+            saveToLocalStorage();
+            return result;
+        };
+    </script>
+</body>
+</html>
